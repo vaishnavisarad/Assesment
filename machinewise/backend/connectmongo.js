@@ -20,10 +20,9 @@ async function main() {
     const collection = client.db('machinewise').collection('machinewise');
 
     // Define the endpoint
-    let data;
     app.get('/data', async (req, res) => {
       try {
-        data = await collection.find().toArray();
+        const data = await collection.find().toArray();
         res.json(data);
       } catch (err) {
         console.error('Error fetching data', err);
@@ -33,20 +32,41 @@ async function main() {
 
     app.get('/filter', async (req, res) => {
       const { start, frequency } = req.query;
-      // Convert start time to Date object
+      console.log("Filtering data:", start, frequency);
       const startTime = new Date(start);
-      // Filter data based on start time and frequency
-      const filteredData = data.filter(item => {
-        const itemTime = new Date(item.ts);
+      try {
+        let endTime;
         switch (frequency) {
           case 'hour':
-            return itemTime >= startTime && itemTime < new Date(startTime).setHours(startTime.getHours() + 1);
+            endTime = new Date(startTime);
+            endTime.setHours(endTime.getHours() + 1);
+            break;
           case 'day':
-            return itemTime >= startTime && itemTime < new Date(startTime).setDate(startTime.getDate() + 1);
-          // Add more cases for week and month
+            endTime = new Date(startTime);
+            endTime.setDate(endTime.getDate() + 1);
+            break;
+          case 'week':
+            endTime = new Date(startTime);
+            endTime.setDate(endTime.getDate() + 7);
+            break;
+          case 'month':
+            endTime = new Date(startTime);
+            endTime.setMonth(endTime.getMonth() + 1);
+            break;
+          default:
+            throw new Error('Invalid frequency');
         }
-      });
-      res.json(filteredData);
+        const filteredData = await collection.find({
+          ts: {
+            $gte: startTime,
+            $lt: endTime
+          }
+        }).toArray();
+        res.json(filteredData);
+      } catch (err) {
+        console.error('Error filtering data', err);
+        res.status(500).send('Error filtering data');
+      }
     });
     
 
